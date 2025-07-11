@@ -1,0 +1,75 @@
+1. file system check (sudo fsck /dev/sdb2)
+
+2. sudo mount /dev/sdb2 /media/kali/persistence (mounting the usb in a directory where files can be accessed by kali)
+
+3. (optional) if the persistence directory create one (sudo mkdir -p /media/kali/persistence) then paste this again (sudo mount /dev/sdb2 /media/kali/persistence)
+
+4. block device identification (sudo blkid /dev/sdb2)
+
+5. add  a -t flag for the drive type (sudo mount -t ext4 /dev/sdb2 /media/kali/persistence)
+
+6. now check if it has been mounted successfully ( mount | grep sdb2)
+
+7. (optional) for unmounting (sudo umount /media/kali/persistence  # Unmount if currently mounted)
+
+
+
+
+the scipt
+
+#!/bin/bash
+# Kali Linux Persistence Mount Helper
+# Usage: ./persistence_helper.sh
+
+echo -e "\n\033[1;34m=== Kali Persistence Mount Helper ===\033[0m"
+
+# Step 1: Filesystem check
+echo -e "\n\033[1;36m[1/7] Running filesystem check...\033[0m"
+sudo fsck /dev/sdb2
+fsck_exit=$?
+if [ $fsck_exit -gt 1 ]; then
+    echo -e "\033[1;31mFilesystem errors detected! Run repair with: sudo fsck -y /dev/sdb2\033[0m"
+    exit 1
+fi
+
+# Step 2: Create mount point if needed
+echo -e "\n\033[1;36m[2/7] Checking mount point...\033[0m"
+if [ ! -d "/media/kali/persistence" ]; then
+    echo "Creating persistence directory..."
+    sudo mkdir -p /media/kali/persistence
+fi
+
+# Step 3: Get filesystem type
+echo -e "\n\033[1;36m[3/7] Identifying filesystem...\033[0m"
+fs_type=$(sudo blkid -s TYPE -o value /dev/sdb2)
+echo "Detected filesystem type: $fs_type"
+
+# Step 4: Mount with appropriate type
+echo -e "\n\033[1;36m[4/7] Mounting persistence...\033[0m"
+sudo mount -t $fs_type /dev/sdb2 /media/kali/persistence
+
+# Step 5: Verify mount
+echo -e "\n\033[1;36m[5/7] Verifying mount...\033[0m"
+mount | grep sdb2
+if [ $? -eq 0 ]; then
+    echo -e "\033[1;32mSuccessfully mounted!\033[0m"
+    echo "Contents:"
+    ls -lh /media/kali/persistence/
+else
+    echo -e "\033[1;31mMount failed!\033[0m"
+    exit 1
+fi
+
+# Step 6: Add to fstab
+echo -e "\n\033[1;36m[6/7] Adding to fstab...\033[0m"
+uuid=$(sudo blkid -s UUID -o value /dev/sdb2)
+echo "UUID=$uuid /media/kali/persistence $fs_type defaults 0 2" | sudo tee -a /etc/fstab
+
+# Step 7: Final instructions
+echo -e "\n\033[1;36m[7/7] Process complete!\033[0m"
+echo -e "\n\033[1;33mTo unmount later, use:\033[0m"
+echo "sudo umount /media/kali/persistence"
+echo -e "\n\033[1;33mTo mount automatically next boot:\033[0m"
+echo "System will auto-mount via fstab entry"
+
+echo -e "\n\033[1;34m=== Operation Complete ===\033[0m"
